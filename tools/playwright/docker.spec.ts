@@ -1,3 +1,7 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -38,6 +42,26 @@ describe('buildDockerCommand', () => {
       'bash', '-c', expect.stringContaining('pnpm test:pw "$@"'),
       'bash', 'src/a.pw.tsx', '-g', 'renders the empty state', '--update-snapshots',
     ]);
+  });
+
+  it('mounts linked worktree metadata at the absolute path used by its .git pointer', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pw-worktree-'));
+    try {
+      const mainGit = path.join(root, 'main', '.git');
+      const worktreeGit = path.join(mainGit, 'worktrees', 'feature');
+      const cwd = path.join(root, 'feature');
+      fs.mkdirSync(worktreeGit, { recursive: true });
+      fs.mkdirSync(cwd);
+      fs.writeFileSync(path.join(cwd, '.git'), `gitdir: ${ worktreeGit }\n`);
+      fs.writeFileSync(path.join(worktreeGit, 'commondir'), '../..\n');
+
+      const { args } = buildDockerCommand([ '--changed' ], OPTIONS, cwd);
+      expect(args).toContain(`${ mainGit }:${ mainGit }:ro`);
+      expect(args).toContain(`${ cwd }:${ CONTAINER_WORKDIR }`);
+      expect(args.slice(-2)).toEqual([ 'bash', '--changed' ]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('activates the pinned pnpm and disables the pre-run dependency check inside the container', () => {

@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 
 import {
@@ -57,6 +58,22 @@ function dockerRunArgs(options: DockerOptions, cwd: string, mounts: ReadonlyArra
   ];
 }
 
+// A linked worktree has a .git *file* pointing outside cwd to the parent checkout's
+// .git/worktrees/<name>. Preserve that absolute path inside Docker so Git can
+// resolve its worktree-specific index and shared refs during --only-changed.
+function worktreeGitMount(cwd: string): Array<string> {
+  const dotGit = path.join(cwd, '.git');
+  if (!fs.existsSync(dotGit) || !fs.statSync(dotGit).isFile()) return [];
+
+  const match = /^gitdir: (.+)\s*$/.exec(fs.readFileSync(dotGit, 'utf8'));
+  if (!match) throw new Error(`Invalid worktree Git pointer: ${ dotGit }`);
+
+  const gitDir = path.resolve(cwd, match[1]);
+  const commonDirFile = path.join(gitDir, 'commondir');
+  const commonDir = path.resolve(gitDir, fs.readFileSync(commonDirFile, 'utf8').trim());
+  return [ `${ commonDir }:${ commonDir }:ro` ];
+}
+
 function linuxModulesMount(cwd: string): string {
   return `${ path.join(cwd, LINUX_MODULES_DIR) }:${ path.posix.join(CONTAINER_WORKDIR, 'node_modules') }`;
 }
@@ -67,7 +84,7 @@ export function buildDockerCommand(args: ReadonlyArray<string>, options: DockerO
   const script = `${ pnpmSetup(options.pnpm) } && ${ INNER_TEST_ENV } pnpm test:pw "$@"`;
   return {
     command: 'docker',
-    args: [ ...dockerRunArgs(options, cwd, [ linuxModulesMount(cwd) ]), 'bash', '-c', script, 'bash', ...args ],
+    args: [ ...dockerRunArgs(options, cwd, [ linuxModulesMount(cwd), ...worktreeGitMount(cwd) ]), 'bash', '-c', script, 'bash', ...args ],
   };
 }
 
