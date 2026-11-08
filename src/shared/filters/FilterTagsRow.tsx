@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-Blockscout
 
 import type { FlexProps } from '@chakra-ui/react';
-import { Flex } from '@chakra-ui/react';
+import { Flex, Link as ChakraLink } from '@chakra-ui/react';
 import React from 'react';
 
 import SpriteIcon from 'src/sprite/SpriteIcon';
 
-import { Link } from 'src/toolkit/chakra/link';
 import { Tag } from 'src/toolkit/chakra/tag';
 
 export interface FilterTag<TKey extends string> {
@@ -46,10 +45,12 @@ const FilterTagsRow = <TKey extends string>({ tags, onClear, onClearAll, leading
         { placeholder }
       </Flex>
       { hasClosableTags && (
-        <Link onClick={ onClearAll } display="flex" alignItems="center" gap={ 1 } textStyle="sm" whiteSpace="nowrap">
-          <SpriteIcon name="repeat" boxSize={ 5 }/>
-          Reset all
-        </Link>
+        <ChakraLink asChild display="flex" alignItems="center" gap={ 1 } textStyle="sm" whiteSpace="nowrap">
+          <button type="button" onClick={ onClearAll } aria-label="Reset all filters">
+            <SpriteIcon name="repeat" boxSize={ 5 }/>
+            Reset all
+          </button>
+        </ChakraLink>
       ) }
     </Flex>
   );
